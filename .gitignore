@@ -103,3 +103,9 @@ ENV/
 ### Emacs ###
 *~
 \#*\#
+
+# Some random XML that metions PyDevBuilder.
+# TODO: Research these and maybe delete them.
+.project
+.pydevproject
+
