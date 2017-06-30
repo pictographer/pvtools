@@ -11,8 +11,7 @@ import psycopg2
 
 from pvextract.pvextract import PVExtract
 
-# Location of the html files to scrape and import.
-root = '../test/data/'
+usage = "Usage:\n    python3 pvtodb.py dir1 [dir2 ...]"
 
 # Constants for home.html
 production_label ="Currently generating"
@@ -34,7 +33,7 @@ def path_timestamp(path):
     
     Assumes the time stamp is the third to last path component.
     E.g. .../third/second/last ==> third'''
-    
+
     # Recall pf is os.path.split() and this function returns a pair
     # (path, basename).
     result = pf(pf(pf(path)[0])[0])[1]
@@ -59,40 +58,48 @@ def normalize_units(quantity):
                     "kWh": 1e3}
     return float(x) * unit_factors[units]
 
-def main():
+def pv_insert(con, cur, root):
+    '''Extract html data from root. Insert it using cursor cur.'''
+
+    # For each directory containing home.html and production.html,
+    # extract the data and insert it into the db.
+    #
+    # If anything other than a version check fails, raise an error.
+    for (path, _, filenames) in os.walk(root, onerror=doraise):
+        if set(filenames) >= set(['home.html', 'production.html']):
+            home_file = os.path.join(path, 'home.html')
+            production_file = os.path.join(path, 'production.html')
+
+            home_extract = PVExtract(home_file)
+            observed_version = home_extract.next_text(version_label)
+            if observed_version != checked_version:
+                print("{}:Warning: version has changed from {} to {}."
+                      .format(sys.argv[0],
+                              checked_version,
+                              observed_version))
+
+            production_extract = PVExtract(production_file)
+            values = (
+                [path_timestamp(home_file)]
+                + [str(normalize_units(production_extract.next_text(f)))
+                   for f in html_fields])
+
+            cur.execute('insert into production '
+                        'values (%s, %s, %s, %s)',
+                        (values[0], values[1], values[2], values[3]))
+    con.commit()
+
+def pv_etl(dirlist):
+    '''Connect to the database and load data from dirlist.'''
     with psycopg2.connect(db_credentials) as con:
         with con.cursor() as cur:
             cur.execute('create table if not exists production ({})'
                         .format(db_columns))
-
-            # For each directory containing home.html and production.html,
-            # extract the data and insert it into the db.
-            # 
-            # If anything other than a version check fails, raise an error.
-            for (path, _, filenames) in os.walk(root, onerror=doraise):
-                if set(filenames) >= set(['home.html', 'production.html']):
-                    home_file = os.path.join(path, 'home.html')
-                    production_file = os.path.join(path, 'production.html')
-                    
-                    home_extract = PVExtract(home_file)
-                    observed_version = home_extract.next_text(version_label)
-                    if observed_version != checked_version:
-                        print("{}:Warning: version has changed from {} to {}."
-                              .format(sys.argv[0],
-                                      checked_version,
-                                      observed_version))
-
-                    production_extract = PVExtract(production_file)
-                    values = (
-                        [path_timestamp(home_file)]
-                        + [str(normalize_units(production_extract.next_text(f)))
-                           for f in html_fields])
-
-                    cur.execute('insert into production '
-                                'values (%s, %s, %s, %s)',
-                                (values[0], values[1], values[2], values[3]))
-            con.commit()
-
+            for root in dirlist:
+                pv_insert(con, cur, root)
 
 if __name__ == '__main__':
-    main()
+    if 1 < len(sys.argv):
+        pv_etl(sys.argv[1:])
+    else:
+        print(usage)
