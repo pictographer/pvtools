@@ -56,8 +56,9 @@ def normalize_units(quantity):
                     "kW": 1e3,
                     "Wh": 1.,
                     "kWh": 1e3}
-    return float(x) * unit_factors[units]
+    return float(x.replace(",", "")) * unit_factors[units]
 
+row = 0
 def pv_insert(con, cur, root):
     '''Extract html data from root. Insert it using cursor cur.'''
 
@@ -73,8 +74,9 @@ def pv_insert(con, cur, root):
             home_extract = PVExtract(home_file)
             observed_version = home_extract.next_text(version_label)
             if observed_version != checked_version:
-                print("{}:Warning: version has changed from {} to {}."
+                print("{}:{}:Warning: version has changed from {} to {}."
                       .format(sys.argv[0],
+                              path,
                               checked_version,
                               observed_version))
 
@@ -87,6 +89,9 @@ def pv_insert(con, cur, root):
             cur.execute('insert into production '
                         'values (%s, %s, %s, %s)',
                         (values[0], values[1], values[2], values[3]))
+            if row % 100 == 0:
+                print("{}: {}".format(row, values[0]))
+            ++row
     con.commit()
 
 def pv_etl(dirlist):
