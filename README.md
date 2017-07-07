@@ -110,3 +110,17 @@ numerical values such as [pint](https://pint.readthedocs.io/en/0.7.2/), but
 decided it would be more work to find the best one than to write a seven-line
 function.
 
+## Handy SQL Queries
+
+Show the production for each week:
+
+```sql
+SELECT *
+FROM
+  (SELECT extract(week FROM TIME) AS w,
+          extract(YEAR FROM TIME) AS y,
+	  max(week_wh) AS max_wh
+   FROM production GROUP BY w, y) a
+ORDER BY 100 * y + w;
+```
+
