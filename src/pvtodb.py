@@ -11,6 +11,7 @@ import psycopg2
 
 from pvextract.pvextract import PVExtract
 
+
 usage = "Usage:\n    python3 pvtodb.py dir1 [dir2 ...]"
 
 # Constants for home.html
@@ -47,9 +48,16 @@ def doraise(err):
 def normalize_units(quantity):
     '''Convert a string "<float> <unit>" to a float scaled to the base unit.
     
-    For any unit that contains a scaling factor, scale the float so that
-    no conversion factor is needed. For example 2 kW returns 2000.0. If the
-    unit designator is not recognized, KeyError is raised.'''
+    Scale the float so that no conversion factor is needed. Unit
+    designator must be one of the keys for dictionary units_factors.
+
+    For example, normalize_units('2 kW') returns 2000.0.
+
+    If the unit designator is not recognized, KeyError is raised. If
+    the quantity input cannot be split on whitespace, a ValueError is
+    raised.
+
+    '''
 
     (x, units) = quantity.split()
     unit_factors = {"W": 1.,
@@ -91,17 +99,19 @@ def pv_insert(con, cur, root):
                         (values[0], values[1], values[2], values[3]))
             if row % 100 == 0:
                 print("{}: {}".format(row, values[0]))
-            ++row
+            row += 1
     con.commit()
 
 def pv_etl(dirlist):
     '''Connect to the database and load data from dirlist.'''
+
     with psycopg2.connect(db_credentials) as con:
         with con.cursor() as cur:
             cur.execute('create table if not exists production ({})'
                         .format(db_columns))
             for root in dirlist:
                 pv_insert(con, cur, root)
+
 
 if __name__ == '__main__':
     if 1 < len(sys.argv):
