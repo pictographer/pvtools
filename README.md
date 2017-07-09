@@ -117,10 +117,21 @@ Show the production for each week:
 ```sql
 SELECT *
 FROM
-  (SELECT extract(week FROM TIME) AS w,
-          extract(YEAR FROM TIME) AS y,
+  (SELECT extract(week FROM time) AS week,
+          extract(YEAR FROM time) AS year,
 	  max(week_wh) AS max_wh
-   FROM production GROUP BY w, y) a
-ORDER BY 100 * y + w;
+   FROM production GROUP BY week, year) a
+ORDER BY year, week;
+```
+
+Show the peak production values per year:
+
+```sql
+SELECT *
+FROM
+  (SELECT extract(year FROM time) AS year,
+          max(power_w) AS power_w
+   FROM production GROUP BY year) a
+ORDER BY year;
 ```
 
